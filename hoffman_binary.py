@@ -49,15 +49,16 @@ def create_code(root):
 # Recursive helper function to traverse the Hoffman tree
 def traverse_helper(node, code, ret_dict):
     if type(node[2]) == str:
-        print(node, code)
+        # print(node, code)
         temp = code.copy()  # Prevents code from changing in-place
         ret_dict[node[2]] = temp
         code.pop()
         
         return
     
-    traverse_helper(node[2].left, code + [0], ret_dict)
-    traverse_helper(node[2].right, code + [1], ret_dict)
+    # Left is coded as 1 and right coded as 0
+    traverse_helper(node[2].left, code + [1], ret_dict)
+    traverse_helper(node[2].right, code + [0], ret_dict)
 
 # Returns a tuple of tree nodes and path direction based on an input word
 def get_path_nodes(word, code_dict, root):
@@ -67,10 +68,12 @@ def get_path_nodes(word, code_dict, root):
 
     for direction in code:
         nodes.append((cur, direction))
-        
-        if direction == 0:
+
+         # Left is coded as 1
+        if direction == 1:
             cur = cur.left[2]
         
+        # Right is coded as 0
         else:
             cur = cur.right[2]
 
@@ -78,7 +81,7 @@ def get_path_nodes(word, code_dict, root):
 
 
 if __name__ == '__main__':
-    word_counts = {'natural': 1, 'language': 1, 'processing': 1, 'and': 2, 'machine': 1, 'learning': 1, 'is': 1, 'fun': 1, 'exciting': 1}
+    word_counts = {'natural': 4, 'language': 3, 'processing': 1}
 
     freq = [
     (8.167, 'a'), (1.492, 'b'), (2.782, 'c'), (4.253, 'd'),
@@ -94,6 +97,6 @@ if __name__ == '__main__':
 
     root = create_tree(word_counts, 10)
     code_dict = create_code(root)
-    #nodes = get_path_nodes('processing', code_dict, root)
+    nodes = get_path_nodes('processing', code_dict, root)
     
 

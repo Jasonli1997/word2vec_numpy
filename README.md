@@ -4,7 +4,7 @@ This is a implementation of Word2Vec using numpy. Click [here](https://derekchia
 
 To see Word2Vec in action, uncomment the print functions! Also remember to change the number of `epochs` and set `training_data` to `training_data[0]` to avoid flooding your terminal. A Google Sheet implementation of Word2Vec is also available [here](https://docs.google.com/spreadsheets/d/1mgf82Ue7MmQixMm2ZqnT1oWUucj6pEcd2wDs_JgHmco/edit?usp=sharing).
 
-There is also the Continuous Bag-of-Words version of Word2Vec implementation as well and more computing-efficient methods will be added in the future.
+There is also the Continuous Bag-of-Words version of Word2Vec implementation with support for hierarchical softmax as well and more computing-efficient methods such as negative sampling will be added in the future.
 
 ![Word2Vec - Skip-Gram](https://i.ibb.co/XbKnHGP/Screenshot-2018-12-03-at-8-27-46-PM.png)
 
@@ -13,5 +13,5 @@ There is also the Continuous Bag-of-Words version of Word2Vec implementation as 
 To start, run the script using:
 
 ```
-python wordtovec.py
+python skipgram.py
 ```
