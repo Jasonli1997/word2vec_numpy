@@ -94,6 +94,9 @@ class word2vec_cbow:
         for sentence in corpus:
             sent_len = len(sentence)
 
+            if sent_len == 1:
+                continue
+
             # Cycle through each word in sentence
             for i, word in enumerate(sentence):
                 # Save target word 
@@ -155,10 +158,13 @@ class word2vec_cbow:
         # https://docs.scipy.org/doc/numpy-1.15.1/reference/generated/numpy.random.uniform.html
         self.w1 = np.array(getW1)
         # self.w1 = np.random.uniform(-1, 1, (self.v_count, self.n))
-
+        
+        # TODO: find repetitive computations because this is very slow 
         if self.hierarchical_softmax:
             # Cycle through each epoch
             for i in range(self.epochs):
+                print(f'Start Epoch {i}...')
+
                 # Intialise loss to 0
                 self.loss = 0
                 # Cycle through each training sample
@@ -197,8 +203,7 @@ class word2vec_cbow:
                     # break 													#
                     #############################################################
 
-                if i % 10 == 0:
-                    print('Epoch:', i, "Loss:", self.loss)
+                print('Epoch:', i, "Loss:", self.loss)
         
         else:
             self.w2 = np.array(getW2)
@@ -206,6 +211,8 @@ class word2vec_cbow:
 
             # Cycle through each epoch
             for i in range(self.epochs):
+                print(f'Start Epoch {i}...')
+
                 # Intialise loss to 0
                 self.loss = 0
                 # Cycle through each training sample
@@ -253,8 +260,7 @@ class word2vec_cbow:
                     # break 													#
                     #############################################################
 
-                if i % 10 == 0:
-                    print('Epoch:', i, "Loss:", self.loss)
+                print('Epoch:', i, "Loss:", self.loss)
 
     def forward_pass(self, x): 
         # x is one-hot matrix for context words, shape - CxV (V is the vocab size and C is the number of context words)

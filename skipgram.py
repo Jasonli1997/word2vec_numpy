@@ -32,15 +32,16 @@ getW2 = [[-0.868, -0.406, -0.288, -0.016, -0.560, 0.179, 0.099, 0.438, -0.551],
 		[-0.838, 0.053, -0.160, -0.164, -0.671, 0.140, -0.149, 0.708, 0.425],
 		[0.096, -0.995, -0.313, 0.881, -0.402, -0.631, -0.660, 0.184, 0.487]]
 
-class word2vec():
+class skipgram():
 
-	def __init__(self):
+	def __init__(self, settings):
 		self.n = settings['n']
 		self.lr = settings['learning_rate']
 		self.epochs = settings['epochs']
 		self.window = settings['window_size']
+		self.negative_samples = settings['negative_samples']
 
-	def generate_training_data(self, settings, corpus):
+	def generate_training_data(self, corpus):
 		# Find unique word counts using dictonary
 		word_counts = defaultdict(int)
 		for row in corpus:
@@ -85,10 +86,13 @@ class word2vec():
 		for sentence in corpus:
 			sent_len = len(sentence)
 
+			if sent_len == 1:
+				continue 
+
 			# Cycle through each word in sentence
 			for i, word in enumerate(sentence):
-				# Convert target word to one-hot
-				w_target = self.word2onehot(sentence[i])
+				# Save target word 
+				w_target = word
 
 				# Cycle through context window
 				w_context = []
@@ -100,8 +104,8 @@ class word2vec():
 					# 2. Index must be greater or equal than 0 (j >= 0) - if not list index out of range
 					# 3. Index must be less or equal than length of sentence (j <= sent_len-1) - if not list index out of range 
 					if j != i and j <= sent_len-1 and j >= 0:
-						# Append the one-hot representation of word to w_context
-						w_context.append(self.word2onehot(sentence[j]))
+						# Append context word to w_context
+						w_context.append(sentence[j])
 						# print(sentence[i], sentence[j]) 
 						#########################
 						# Example:				#
@@ -113,6 +117,7 @@ class word2vec():
 						#########################
 						
 				# training_data contains a one-hot representation of the target word and context words
+                # only the word is store instead of its one-hot encoding due to storage limit and it crashes kernel
 				#################################################################################################
 				# Example:																						#
 				# [Target] natural, [Context] language, [Context] processing									#
@@ -121,11 +126,11 @@ class word2vec():
 				#################################################################################################
 				training_data.append([w_target, w_context])
 
-		return np.array(training_data)
+		return training_data
 
 	def word2onehot(self, word):
 		# word_vec - initialise a blank vector
-		word_vec = [0 for i in range(0, self.v_count)] # Alternative - np.zeros(self.v_count)
+		word_vec = np.zeros(self.v_count)
 		#############################
 		# print(word_vec)			#
 		# [0, 0, 0, 0, 0, 0, 0, 0]	#
@@ -148,58 +153,140 @@ class word2vec():
 		# self.w1 = np.random.uniform(-1, 1, (self.v_count, self.n))
 		# self.w2 = np.random.uniform(-1, 1, (self.n, self.v_count))
 		
-		# Cycle through each epoch
-		for i in range(self.epochs):
-			# Intialise loss to 0
-			self.loss = 0
-			# Cycle through each training sample
-			# w_t = vector for target word, w_c = vectors for context words
-			for w_t, w_c in training_data:
-				# Forward pass
-				# 1. predicted y using softmax (y_pred) 2. matrix of hidden layer (h) 3. output layer before softmax (u)
-				y_pred, h, u = self.forward_pass(w_t)
-				#########################################
-				# print("Vector for target word:", w_t)	#
-				# print("W1-before backprop", self.w1)	#
-				# print("W2-before backprop", self.w2)	#
-				#########################################
+		if self.negative_samples == 0:
+			# Cycle through each epoch
+			for i in range(self.epochs):
+				print(f'Start Epoch {i}...')
 
-				# Calculate error
-				# 1. For a target word, calculate difference between y_pred and each of the context words
-				# 2. Sum up the differences using np.sum to give us the error for this particular target word
-				EI = np.sum([np.subtract(y_pred, word) for word in w_c], axis=0)
-				#########################
-				# print("Error", EI)	#
-				#########################
+				# Intialise loss to 0
+				self.loss = 0
 
-				# Backpropagation
-				# We use SGD to backpropagate errors - calculate loss on the output layer 
-				self.backprop(EI, h, w_t)
-				#########################################
-				#print("W1-after backprop", self.w1)	#
-				#print("W2-after backprop", self.w2)	#
-				#########################################
+				# Cycle through each training sample
+				# w_t = vector for target word, w_c = vectors for context words
+				for w_t, w_c in training_data:
+					w_t = self.word2onehot(w_t).reshape((-1, 1))
+					w_c = [self.word2onehot(context) for context in w_c]
+					# Forward pass
+					# 1. predicted y using softmax (y_pred) 2. matrix of hidden layer (h) 3. output layer before softmax (u)
+					y_pred, h, u = self.forward_pass(w_t)
+					#########################################
+					# print("Vector for target word:", w_t)	#
+					# print("W1-before backprop", self.w1)	#
+					# print("W2-before backprop", self.w2)	#
+					#########################################
 
-				# Calculate loss
-				# There are 2 parts to the loss function
-				# Part 1: -ve sum of all the output +
-				# Part 2: length of context words * log of sum for all elements (exponential-ed) in the output layer before softmax (u)
-				# Note: word.index(1) returns the index in the context word vector with value 1
-				# Note: u[word.index(1)] returns the value of the output layer before softmax
-				self.loss += -np.sum([u[word.index(1)] for word in w_c]) + len(w_c) * np.log(np.sum(np.exp(u)))
+					# Calculate error
+					# 1. For a target word, calculate difference between y_pred and each of the context words
+					# 2. Sum up the differences using np.sum to give us the error for this particular target word
+					EI = np.sum([np.subtract(y_pred, word.reshape((-1, 1))) for word in w_c], axis=0)
+					#########################
+					# print("Error", EI)	#
+					#########################
+
+					# Backpropagation
+					# We use SGD to backpropagate errors - calculate loss on the output layer 
+					self.backprop(EI, h, w_t)
+					#########################################
+					#print("W1-after backprop", self.w1)	#
+					#print("W2-after backprop", self.w2)	#
+					#########################################
+
+					# Calculate loss
+					# There are 2 parts to the loss function
+					# Part 1: -ve sum of all the output +
+					# Part 2: length of context words * log of sum for all elements (exponential-ed) in the output layer before softmax (u)
+					# Note: word.index(1) returns the index in the context word vector with value 1
+					# Note: u[word.index(1)] returns the value of the output layer before softmax
+					self.loss += -np.sum([u[np.where(word == 1)[0][0]] for word in w_c]) + len(w_c) * np.log(np.sum(np.exp(u)))
+					
+					#############################################################
+					# Break if you want to see weights after first target word 	#
+					# break 													#
+					#############################################################
+				print('Epoch:', i, "Loss:", self.loss)
+		
+		else:
+			# Cycle through each epoch
+			for i in range(self.epochs):
+				print(f'Start Epoch {i}...')
+
+				# Intialise loss to 0
+				self.loss = 0
+
+				# Cycle through each training sample
+				# w_t = vector for target word, w_c = vectors for context words
+				for w_t, w_c in training_data:
+					w_t = self.word2onehot(w_t).reshape((-1, 1))
+					w_c = [self.word2onehot(context) for context in w_c]
+					# Forward pass
+					# 1. matrix of hidden layer (h) 2. output layer before softmax (u)
+					# Run through first matrix (w1) to get hidden layer - NxV @ Vx1
+					h = np.matmul(self.w1.T, w_t)
+					# Dot product hidden layer with second matrix (w2) - VxN @ Nx1
+					# Note: outputs before softmax are important since they stay the same 
+					# and allow us to alter w2 without worrying about the loss function
+					u = np.matmul(self.w2.T, h)
+
+					#########################################
+					# print("Vector for target word:", w_t)	#
+					# print("W1-before backprop", self.w1)	#
+					# print("W2-before backprop", self.w2)	#
+					#########################################
+
+					# Initialize EH for backpropagating to w1
+					EH = np.zeros((self.n, 1))
+
+					# Iterate through every context word as postive sample
+					# and use uniform distribution to draw negative samples
+					# TODO: uniform distribution for now but will do more research on unigram
+					for j in range(len(w_c)):
+						# Get postive and negative samples
+						pos_sample = w_c[j]
+						neg_samples = np.random.randint(low=0, high=self.v_count, size=self.negative_samples)
+
+						# Get the intermediate steps and store the tuples (idx, u[idx]) in updates to avoid redundant computation
+						# First element in updates is always the positive sample
+						updates = []
+						updates.append((np.where(pos_sample == 1)[0][0], self.sigmoid(u[np.where(pos_sample == 1)[0][0]])))
+						for idx in neg_samples:
+							updates.append((idx, self.sigmoid(-u[idx])))
+						
+						# Calculate loss
+						# There are 2 parts to the loss function (postive sample and negative samples)
+						self.loss += -np.log(updates[0][1]) - sum([np.log(neg) for _, neg in updates[1:]])
+
+						# Backpropagation
+						# We use SGD to backpropagate errors - calculate loss on the output layer
+						# Update vector in w2 (NxV) corresponding to the positive sample
+						self.w2[:, [updates[0][0]]] = self.w2[:, [updates[0][0]]] - (self.lr * (updates[0][1] - 1) * h)
+						EH += (updates[0][1] - 1) * self.w2[:, [updates[0][0]]]
+						
+						# Update vector in w2 corresponding to the negative sample
+						for (idx, neg) in updates[1:]:
+							self.w2[:, [idx]] = self.w2[:, [idx]] - (self.lr * (1 - neg) * h)
+							EH += (1 - neg) * self.w2[:, [idx]]
+					
+					# After calculating EH for each context word, we can now update w1 as normal skipgram
+					dl_dw1 = np.outer(w_t, EH)
+					self.w1 = self.w1 - (self.lr * dl_dw1)
+
+					#########################################
+					#print("W1-after backprop", self.w1)	#
+					#print("W2-after backprop", self.w2)	#
+					#########################################
 				
-				#############################################################
-				# Break if you want to see weights after first target word 	#
-				# break 													#
-				#############################################################
-			print('Epoch:', i, "Loss:", self.loss)
+					#############################################################
+					# Break if you want to see weights after first target word 	#
+					# break 													#
+					#############################################################
+				print('Epoch:', i, "Loss:", self.loss)
 
 	def forward_pass(self, x):
-		# x is one-hot vector for target word, shape - 9x1
-		# Run through first matrix (w1) to get hidden layer - 10x9 dot 9x1 gives us 10x1
-		h = np.dot(x, self.w1)
-		# Dot product hidden layer with second matrix (w2) - 9x10 dot 10x1 gives us 9x1
-		u = np.dot(h, self.w2)
+		# x is one-hot vector for target word, shape - Vx1
+		# Run through first matrix (w1) to get hidden layer - NxV @ Vx1
+		h = np.matmul(self.w1.T, x)
+		# Dot product hidden layer with second matrix (w2) - VxN @ Nx1 
+		u = np.matmul(self.w2.T, h)
 		# Run 1x9 through softmax to force each element to range of [0, 1] - 1x8
 		y_c = self.softmax(u)
 		return y_c, h, u
@@ -207,6 +294,9 @@ class word2vec():
 	def softmax(self, x):
 		e_x = np.exp(x - np.max(x))
 		return e_x / e_x.sum(axis=0)
+	
+	def sigmoid(self, x):
+		return 1/(1+np.exp(-x))
 
 	def backprop(self, e, h, x):
 		# https://docs.scipy.org/doc/numpy-1.15.1/reference/generated/numpy.outer.html
@@ -215,7 +305,7 @@ class word2vec():
 		# h - shape 10x1, e - shape 9x1, dl_dw2 - shape 10x9
 		# x - shape 9x1, w2 - 10x9, e.T - 9x1
 		dl_dw2 = np.outer(h, e)
-		dl_dw1 = np.outer(x, np.dot(self.w2, e.T))
+		dl_dw1 = np.outer(x, np.dot(self.w2, e))
 		########################################
 		# print('Delta for w2', dl_dw2)			#
 		# print('Hidden layer', h)				#
@@ -239,14 +329,15 @@ class word2vec():
 		word_sim = {}
 
 		for i in range(self.v_count):
-			# Find the similary score for each word in vocab
-			v_w2 = self.w1[i]
-			theta_sum = np.dot(v_w1, v_w2)
-			theta_den = np.linalg.norm(v_w1) * np.linalg.norm(v_w2)
-			theta = theta_sum / theta_den
+			if self.index_word[i] != word:
+				# Find the cosine similary score for each word in vocab except for the current word
+				v_w2 = self.w1[i]
+				theta_sum = np.dot(v_w1, v_w2)
+				theta_den = np.linalg.norm(v_w1) * np.linalg.norm(v_w2)
+				theta = theta_sum / theta_den
 
-			word = self.index_word[i]
-			word_sim[word] = theta
+				w2 = self.index_word[i]
+				word_sim[w2] = theta
 
 		words_sorted = sorted(word_sim.items(), key=lambda kv: kv[1], reverse=True)
 
@@ -258,7 +349,9 @@ settings = {
 	'window_size': 2,			# context window +- center word
 	'n': 10,					# dimensions of word embeddings, also refer to size of hidden layer
 	'epochs': 50,				# number of training epochs
-	'learning_rate': 0.01		# learning rate
+	'learning_rate': 0.01,		# learning rate
+	'negative_samples': 3   	# number of negative samples
+								# 0 -> normal skipgram
 }
 
 text = "natural language processing and machine learning is fun and exciting"
@@ -268,10 +361,10 @@ text = "natural language processing and machine learning is fun and exciting"
 corpus = [[word.lower() for word in text.split()]]
 
 # Initialise object
-w2v = word2vec()
+w2v = skipgram(settings)
 
 # Numpy ndarray with one-hot representation for [target_word, context_words]
-training_data = w2v.generate_training_data(settings, corpus)
+training_data = w2v.generate_training_data(corpus)
 
 # Training
 w2v.train(training_data)
