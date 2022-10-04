@@ -96,8 +96,8 @@ class word2vec_cbow:
 
             # Cycle through each word in sentence
             for i, word in enumerate(sentence):
-                # Convert target word to one-hot
-                w_target = self.word2onehot(sentence[i])
+                # Save target word 
+                w_target = word
 
                 # Cycle through context window
                 w_context = []
@@ -109,8 +109,8 @@ class word2vec_cbow:
                     # 2. Index must be greater or equal than 0 (j >= 0) - if not list index out of range
                     # 3. Index must be less or equal than length of sentence (j <= sent_len-1) - if not list index out of range 
                     if j != i and j <= sent_len-1 and j >= 0:
-                        # Append the one-hot representation of word to w_context
-                        w_context.append(self.word2onehot(sentence[j]))
+                        # Append context word to w_context
+                        w_context.append(sentence[j])
                         # print(sentence[i], sentence[j]) 
                         #########################
                         # Example:				#
@@ -122,6 +122,7 @@ class word2vec_cbow:
                         #########################
                         
                 # training_data contains a one-hot representation of the target word and context words
+                # only the word is store instead of its one-hot encoding due to storage limit and it crashes kernel
                 #################################################################################################
                 # Example:																						#
                 # [Target] natural, [Context] language, [Context] processing									#
@@ -164,6 +165,8 @@ class word2vec_cbow:
                 # w_t = vector for target word, w_c = vectors for context words
                 for w_t, w_c in training_data:
                     # Forward pass
+                    w_t = self.word2onehot(w_t)
+                    w_c = [self.word2onehot(context) for context in w_c]
                     h, sum_x, inner_units = self.forward_pass_hierarchical(w_c, w_t)
                     #########################################
                     # print("Vector for context word:", w_c)#
@@ -210,6 +213,8 @@ class word2vec_cbow:
                 for w_t, w_c in training_data:
                     # Forward pass
                     # 1. predicted y using softmax (y_pred) 2. matrix of hidden layer (h) 3. output layer before softmax (u)
+                    w_t = self.word2onehot(w_t)
+                    w_c = [self.word2onehot(context) for context in w_c]
                     y_pred, h, u, sum_x = self.forward_pass(w_c)
                     #########################################
                     # print("Vector for context word:", w_c)#
@@ -354,7 +359,7 @@ if __name__ == '__main__':
 	'n': 10,					# dimensions of word embeddings, also refer to size of hidden layer
 	'epochs': 50,				# number of training epochs
 	'learning_rate': 0.01,		# learning rate
-    'hierarchical_softmax': False # whether or not to implement hierarchical softmax to get 
+    'hierarchical_softmax': True # whether or not to implement hierarchical softmax to get 
                                  # compututational complexity of O(logV) instead of O(V)
     }
 

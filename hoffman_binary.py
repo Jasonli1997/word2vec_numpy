@@ -23,8 +23,9 @@ class TreeNode:
         return((self.left, self.right))
 
 # Creates a Hoffman binary tree based on word frequencies
-def create_tree(word_counts, n):
+def create_tree(word_counts, n, random_seed=0):
     p = queue.PriorityQueue()
+    np.random.seed(random_seed)
 
     # Create an index to deal with equal frequency comparisons
     index = count(0)                    
